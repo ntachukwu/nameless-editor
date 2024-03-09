@@ -99,6 +99,8 @@ int getWindowSize(int *rows, int *cols) {
 }
 
 /** append buffer */
+// Too many calls to the write function.
+// It's best to use a buffer. Like a python list'
 // Since C does not suppoert dynamic strings
 // abuf will server as our buffer.
 // It consists of a pointer to our buffer in memory, and a length.
@@ -125,22 +127,31 @@ void abAppend(struct abuf *ab, const char *s, int len) {
   // Copy the content of s into &new[ab->len] (the last position of the newly
   // allocated memory)
   memcpy(&new[ab->len], s, len);
+  // asign the new memory to ab and increase the len of the buffer
   ab->b = new;
   ab->len += len;
 }
 
-void abFree(struct abuf *ab) { free(ab->b); }
+void abFree(struct abuf *ab) {
+  // free up the ab buffer
+  free(ab->b);
+}
 
-void editorDrawRows() {
+void editorDrawRows(struct abuf *ab) {
   int y;
   for (y = 0; y < E.screenrows; y++) {
-    write(STDOUT_FILENO, "~", 1);
+    abAppend(ab, "~", 1);
 
+    // K Erase in-line.
+    // 0 erases the part of the line to the right.
+    // 0 is the default argument.
+    abAppend(ab, "\x1b[K", 3);
     if (y < E.screenrows - 1) {
-      write(STDOUT_FILENO, "\r\n", 2);
+      abAppend(ab, "\r\n", 2);
     }
   }
 }
+
 /*** input ***/
 
 void editorProcessKeypress() {
@@ -161,13 +172,25 @@ void editorRefreshScreen() {
   // argument of 2 to the command J. J is the command to clear screen. H is the
   // command to reaturn cursor position. All these are from the VT100. Check the
   // VT100 User Guide for the complete documentation of each escape sequence.
-  write(STDOUT_FILENO, "\x1b[2J", 4); // Clear Screen
-  write(STDOUT_FILENO, "\x1b[H",
-        3); // Return cursor to the top-most-left corner of the screen.
 
-  editorDrawRows(); // Draw the ~ char on every row
+  struct abuf ab = ABUF_INIT;
 
-  write(STDOUT_FILENO, "\x1b[H", 3); // Return cursor to top-most-left corner
+  abAppend(&ab, "\x1b[?25l",
+           6); // Hide cursor first. To prevent flickering on some systems.
+  // abAppend(&ab, "\x1b[2J", 4); // Clear Screen
+  // Instead of clearing the entire screen like the commented line of code above
+  // suggests. We should instead put a <esc>[k sequence at the end of each line
+  // we draw inside the editorDrawRows function.
+  abAppend(&ab, "\x1b[H",
+           3); // Return cursor to the top-most-left corner of the screen.
+
+  editorDrawRows(&ab); // Draw the ~ char on every row
+
+  abAppend(&ab, "\x1b[H", 3); // Return cursor to top-most-left corner
+  abAppend(&ab, "\x1b[?25h", 6);
+
+  write(STDOUT_FILENO, ab.b, ab.len);
+  abFree(&ab);
 }
 
 /*** init */
