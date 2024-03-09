@@ -11,6 +11,7 @@
 /*** defines ***/
 
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define NAMELESS_VERSION "0.0.1"
 
 /*** data ***/
 struct editorConfig {
@@ -140,7 +141,26 @@ void abFree(struct abuf *ab) {
 void editorDrawRows(struct abuf *ab) {
   int y;
   for (y = 0; y < E.screenrows; y++) {
-    abAppend(ab, "~", 1);
+    if (y == E.screenrows / 3) {
+      // write a welcome message to the screen
+      char welcome[80];
+      int welcomelen =
+          snprintf(welcome, sizeof(welcome), "Nameless editor --version %s",
+                   NAMELESS_VERSION);
+      if (welcomelen > E.screencols)
+        welcomelen = E.screencols;
+
+      int padding = (E.screencols - welcomelen) / 2;
+      if (padding) {
+        abAppend(ab, "~", 1);
+        // padding--;
+      }
+      while (padding--)
+        abAppend(ab, " ", 1);
+      abAppend(ab, welcome, welcomelen);
+    } else {
+      abAppend(ab, "~", 1);
+    }
 
     // K Erase in-line.
     // 0 erases the part of the line to the right.
